@@ -1,0 +1,9 @@
+name: ZombieGame
+main: sinsa.zombie.ZombieGame
+version: ${project.version}
+softdepend: [PlaceholderAPI]
+
+commands:
+  zombie:
+    description: 메인 명령어
+    aliases: [zb]
