@@ -63,11 +63,14 @@ public class KitWizard extends CustomGUI {
         if (!e.getInventory().equals(gui)) return;
 
         int slot = e.getRawSlot();
-        if (slot < ARMOR_START || slot >= ARMOR_START + ARMOR_SIZE) {
+        if (slot < KIT_SIZE || slot >= GUI_SIZE) {
             return;
         }
 
         e.setCancelled(true);
+        if (slot < ARMOR_START || slot >= ARMOR_START + ARMOR_SIZE) {
+            return;
+        }
 
         ItemStack current = gui.getItem(slot);
         ItemStack cursor = e.getCursor();

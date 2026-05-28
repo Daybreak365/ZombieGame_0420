@@ -6,6 +6,7 @@ import sinsa.zombie.config.cached.CachedConfig;
 import sinsa.zombie.utils.logging.Logger;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 public class Kits {
@@ -58,7 +59,12 @@ public class Kits {
     }
 
     public static List<ItemStack> getArmorKit(KitNodes node) {
-        return getKit(getArmorNode(node));
+        List<?> items = instance.get(getArmorNode(node));
+        List<ItemStack> armorKit = new ArrayList<>();
+        for (Object item : items) {
+            armorKit.add(item instanceof ItemStack ? (ItemStack) item : null);
+        }
+        return armorKit;
     }
 
     public static void setArmorKit(KitNodes node, List<ItemStack> items) {
