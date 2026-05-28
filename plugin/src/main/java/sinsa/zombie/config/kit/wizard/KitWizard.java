@@ -169,7 +169,7 @@ public class KitWizard extends CustomGUI {
 
     private boolean isArmorPlaceholder(ItemStack item) {
         if (item == null) return false;
-        if (!item.getType().equals(MaterialX.LIGHT_BLUE_STAINED_GLASS_PANE.parseMaterial())) return false;
+        if (!item.getType().equals(MaterialX.LIGHT_BLUE_STAINED_GLASS_PANE.getMaterial())) return false;
         if (!item.hasItemMeta() || item.getItemMeta() == null || !item.getItemMeta().hasDisplayName()) return false;
         return item.getItemMeta().getDisplayName().startsWith("§b§l방어구 슬롯:");
     }
