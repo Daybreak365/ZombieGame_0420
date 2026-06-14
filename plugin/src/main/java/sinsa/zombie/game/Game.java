@@ -3,6 +3,7 @@ package sinsa.zombie.game;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -61,11 +62,15 @@ public class Game extends SimpleTimer implements Listener {
 
 
     public static PotionEffect NIGHT_VISION = new PotionEffect(PotionEffectType.NIGHT_VISION, 500, 0, false, false);
+    private static final NamespacedKey ZOMBIE_SPEED_KEY = NamespacedKey.minecraft("ZOMBIE_SPEED");
+    private static final NamespacedKey ZOMBIE_DAMAGE_KEY = NamespacedKey.minecraft("ZOMBIE_DAMAGE");
+    private static final NamespacedKey HUMAN_SPEED_KEY = NamespacedKey.minecraft("HUMAN_SPEED");
+    private static final NamespacedKey HUMAN_DAMAGE_KEY = NamespacedKey.minecraft("HUMAN_DAMAGE");
     private final Random random = new Random();
-    public final AttributeModifier MODIFIER_SPEED = new AttributeModifier(NamespacedKey.minecraft("ZOMBIE_SPEED"), BaseConfig.getInt(BaseNodes.BUFF_ZOMBIE_SPEED) / 100.0, AttributeModifier.Operation.ADD_SCALAR, EquipmentSlotGroup.ANY);
-    public final AttributeModifier MODIFIER_DAMAGE = new AttributeModifier(NamespacedKey.minecraft("ZOMBIE_DAMAGE"), BaseConfig.getInt(BaseNodes.BUFF_ZOMBIE_DAMAGE) / 100.0, AttributeModifier.Operation.ADD_SCALAR, EquipmentSlotGroup.ANY);
-    public final AttributeModifier MODIFIER_HUMAN_SPEED = new AttributeModifier(NamespacedKey.minecraft("HUMAN_SPEED"), BaseConfig.getInt(BaseNodes.BUFF_HUMAN_SPEED) / 100.0, AttributeModifier.Operation.ADD_SCALAR, EquipmentSlotGroup.ANY);
-    public final AttributeModifier MODIFIER_HUMAN_DAMAGE = new AttributeModifier(NamespacedKey.minecraft("HUMAN_DAMAGE"), BaseConfig.getInt(BaseNodes.BUFF_HUMAN_DAMAGE) / 100.0, AttributeModifier.Operation.ADD_SCALAR, EquipmentSlotGroup.ANY);
+    public final AttributeModifier MODIFIER_SPEED = new AttributeModifier(ZOMBIE_SPEED_KEY, BaseConfig.getInt(BaseNodes.BUFF_ZOMBIE_SPEED) / 100.0, AttributeModifier.Operation.ADD_SCALAR, EquipmentSlotGroup.ANY);
+    public final AttributeModifier MODIFIER_DAMAGE = new AttributeModifier(ZOMBIE_DAMAGE_KEY, BaseConfig.getInt(BaseNodes.BUFF_ZOMBIE_DAMAGE) / 100.0, AttributeModifier.Operation.ADD_SCALAR, EquipmentSlotGroup.ANY);
+    public final AttributeModifier MODIFIER_HUMAN_SPEED = new AttributeModifier(HUMAN_SPEED_KEY, BaseConfig.getInt(BaseNodes.BUFF_HUMAN_SPEED) / 100.0, AttributeModifier.Operation.ADD_SCALAR, EquipmentSlotGroup.ANY);
+    public final AttributeModifier MODIFIER_HUMAN_DAMAGE = new AttributeModifier(HUMAN_DAMAGE_KEY, BaseConfig.getInt(BaseNodes.BUFF_HUMAN_DAMAGE) / 100.0, AttributeModifier.Operation.ADD_SCALAR, EquipmentSlotGroup.ANY);
     private final MostKills MOST_KILL_ZOMBIE = new MostKills("좀비"), MOST_KILL_HUMAN = new MostKills("인간");
 
 
@@ -84,6 +89,8 @@ public class Game extends SimpleTimer implements Listener {
     private final Map<UUID, Integer> humanKillCounts = new HashMap<>();
     private final Map<UUID, Integer> zombieKillCounts = new HashMap<>();
     private final Set<UUID> pendingResetPlayers = new HashSet<>();
+    private final Set<UUID> pendingInfecteeKitPlayers = new HashSet<>();
+    private boolean suppressStateChecks = false;
 
     private class MostKills {
 
@@ -189,26 +196,31 @@ public class Game extends SimpleTimer implements Listener {
             case DAYTIME:
                 if (count == 1) {
                     int zombieCount = 0;
-                    final List<Participant> pList = new ArrayList<>(getParticipantsOnline());
-                    for (int i = 0; i < BaseConfig.getInt(BaseNodes.AMOUNT_HERO); i++) {
-                        if (pList.isEmpty()) break;
-                        final int sel = random.nextInt(pList.size());
-                        final Participant selP = pList.remove(sel);
-                        selP.setRole(PlayerRole.HERO);
-                        StatView.get(selP.getPlayer()).addValue(Stats.HERO_LANDING, 1);
-                        initialSurvivors++;
-                    }
-                    for (int i = 0; i < BaseConfig.getInt(BaseNodes.AMOUNT_INITIAL_ZOMBIE); i++) {
-                        if (pList.isEmpty()) break;
-                        final int sel = random.nextInt(pList.size());
-                        final Participant selP = pList.remove(sel);
-                        selP.setRole(PlayerRole.INITIAL_ZOMBIE);
-                        StatView.get(selP.getPlayer()).addValue(Stats.CHOSEN_GENE, 1);
-                        zombieCount++;
-                    }
-                    initialSurvivors += pList.size();
-                    for (Participant left : pList) {
-                        left.setRole(PlayerRole.SURVIVOR);
+                    suppressStateChecks = true;
+                    try {
+                        final List<Participant> pList = new ArrayList<>(getParticipantsOnline());
+                        for (int i = 0; i < BaseConfig.getInt(BaseNodes.AMOUNT_HERO); i++) {
+                            if (pList.isEmpty()) break;
+                            final int sel = random.nextInt(pList.size());
+                            final Participant selP = pList.remove(sel);
+                            selP.setRole(PlayerRole.HERO, true, false);
+                            StatView.get(selP.getPlayer()).addValue(Stats.HERO_LANDING, 1);
+                            initialSurvivors++;
+                        }
+                        for (int i = 0; i < BaseConfig.getInt(BaseNodes.AMOUNT_INITIAL_ZOMBIE); i++) {
+                            if (pList.isEmpty()) break;
+                            final int sel = random.nextInt(pList.size());
+                            final Participant selP = pList.remove(sel);
+                            selP.setRole(PlayerRole.INITIAL_ZOMBIE, true, false);
+                            StatView.get(selP.getPlayer()).addValue(Stats.CHOSEN_GENE, 1);
+                            zombieCount++;
+                        }
+                        initialSurvivors += pList.size();
+                        for (Participant left : pList) {
+                            left.setRole(PlayerRole.SURVIVOR, true, false);
+                        }
+                    } finally {
+                        suppressStateChecks = false;
                     }
                     //Bukkit.broadcastMessage("인간팀 " + initialSurvivors + "명, 좀비팀 " + zombieCount + "명");
                     if (zombieCount == 0 || initialSurvivors == 0) {
@@ -218,9 +230,9 @@ public class Game extends SimpleTimer implements Listener {
                     }
 
                     for (Participant participant : getParticipantsOnline()) {
-                        final Player player = participant.getPlayer();
-                        player.getInventory().addItem(Kits.getKit(KitNodes.valueOf(participant.role.name())).toArray(new ItemStack[0]));
+                        giveRoleKit(participant, participant.role);
                     }
+                    checkState();
                 }
                 break;
         }
@@ -306,7 +318,7 @@ public class Game extends SimpleTimer implements Listener {
     public List<Participant> getHumans() {
         final List<Participant> humans = new ArrayList<>();
         for (Participant participant : getParticipantsOnline()) {
-            if (participant.role.isHuman()) humans.add(participant);
+            if (participant.role.isHuman() && participant.role != PlayerRole.DEFAULT) humans.add(participant);
         }
         return humans;
     }
@@ -346,7 +358,13 @@ public class Game extends SimpleTimer implements Listener {
         }
         if (isParticipating(player.getUniqueId())) {
             final Participant participant = getParticipant(player);
-            syncParticipantState(participant);
+            if (pendingInfecteeKitPlayers.remove(player.getUniqueId())) {
+                player.getInventory().clear();
+                participant.setRole(PlayerRole.INFECTEE, true, false);
+                giveRoleKit(participant, PlayerRole.INFECTEE);
+            } else {
+                syncParticipantState(participant);
+            }
             player.setPlayerListName(participant.getRole().getNameColor() + player.getName());
         }
         checkState();
@@ -354,21 +372,34 @@ public class Game extends SimpleTimer implements Listener {
 
     @EventHandler
     private void onPlayerQuit(final PlayerQuitEvent e) {
-        bossBar.removePlayer(e.getPlayer());
+        final Player player = e.getPlayer();
+        bossBar.removePlayer(player);
+        final Participant participant = getParticipant(player);
+        if (participant != null && shouldInfectOnQuit(participant)) {
+            pendingInfecteeKitPlayers.add(player.getUniqueId());
+            participant.setRole(PlayerRole.INFECTEE, false, false);
+            removeGameModifiers(player);
+            StatView.get(player).addValue(Stats.CELL_METAMORPHOSIS, 1);
+        }
         new BukkitRunnable() {
             @Override
             public void run() {
-                Bukkit.broadcastMessage("isonline: " + e.getPlayer().isOnline());
                 checkState();
             }
         }.runTaskLater(ZombieGame.getInstance(), 5);
+    }
+
+    public void prepareRoleState(Player player) {
+        removeGameModifiers(player);
+        player.setGlowing(false);
     }
 
     private void syncParticipantState(Participant participant) {
         if (participant == null || !isRunning() || currentPhase == GamePhase.PRE_GAME) return;
 
         final Player player = participant.getPlayer();
-        participant.getRole().setup(participant);
+        removeGameModifiers(player);
+        participant.getRole().applyRuntimeState(participant, false);
 
         try {
             if (participant.getRole().isZombie() && currentPhase == GamePhase.NIGHT) {
@@ -377,16 +408,11 @@ public class Game extends SimpleTimer implements Listener {
             }
         } catch (IllegalArgumentException ignored) {}
 
-        if (participant.getRole().isHuman()) {
-            if (lastHumanBuff && getHumanCount() == 1) {
-                try {
-                    player.getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED).addModifier(MODIFIER_HUMAN_SPEED);
-                    player.getAttribute(org.bukkit.attribute.Attribute.ATTACK_DAMAGE).addModifier(MODIFIER_HUMAN_DAMAGE);
-                } catch (IllegalArgumentException ignored) {}
-            } else {
-                player.getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED).removeModifier(MODIFIER_HUMAN_SPEED);
-                player.getAttribute(org.bukkit.attribute.Attribute.ATTACK_DAMAGE).removeModifier(MODIFIER_HUMAN_DAMAGE);
-            }
+        if (participant.getRole().isHuman() && participant.getRole() != PlayerRole.DEFAULT && lastHumanBuff && getHumanCount() == 1) {
+            try {
+                player.getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED).addModifier(MODIFIER_HUMAN_SPEED);
+                player.getAttribute(org.bukkit.attribute.Attribute.ATTACK_DAMAGE).addModifier(MODIFIER_HUMAN_DAMAGE);
+            } catch (IllegalArgumentException ignored) {}
         }
     }
 
@@ -418,15 +444,31 @@ public class Game extends SimpleTimer implements Listener {
         return participants.get(uuid);
     }
 
-    public void addParticipant(Player player) {
-        participants.putIfAbsent(player.getUniqueId(), new Participant(player));
+    public Participant addParticipant(Player player) {
+        return addParticipant(player, true);
+    }
+
+    public Participant addParticipant(Player player, boolean checkState) {
+        Participant participant = participants.computeIfAbsent(player.getUniqueId(), uuid -> new Participant(player));
+        if (checkState) checkState();
+        return participant;
+    }
+
+    public Participant assignRole(Player player, PlayerRole role, boolean giveKit) {
+        Participant participant = addParticipant(player, false);
+        player.getInventory().clear();
+        participant.setRole(role, true, false);
+        if (giveKit) {
+            giveRoleKit(participant, role);
+        }
         checkState();
+        return participant;
     }
 
     public void removeParticipant(UUID uuid) {
         final Participant removed = participants.remove(uuid);
         if (removed != null) {
-            removed.setRole(PlayerRole.DEFAULT);
+            removed.setRole(PlayerRole.DEFAULT, true, false);
             checkState();
         }
     }
@@ -468,10 +510,7 @@ public class Game extends SimpleTimer implements Listener {
     @Override
     protected void onSilentEnd() {
         for (Participant participant : getParticipants()) {
-            participant.getPlayer().getAttribute(Attribute.MOVEMENT_SPEED).removeModifier(MODIFIER_SPEED);
-            participant.getPlayer().getAttribute(Attribute.ATTACK_DAMAGE).removeModifier(MODIFIER_DAMAGE);
-            participant.getPlayer().getAttribute(Attribute.MOVEMENT_SPEED).removeModifier(MODIFIER_HUMAN_SPEED);
-            participant.getPlayer().getAttribute(Attribute.ATTACK_DAMAGE).removeModifier(MODIFIER_HUMAN_DAMAGE);
+            removeGameModifiers(participant.getPlayer());
         }
         HandlerList.unregisterAll(this);
         bossBar.removeAll();
@@ -501,7 +540,7 @@ public class Game extends SimpleTimer implements Listener {
 
         protected Participant(@NotNull Player player) {
             this.player = player;
-            this.role = setRole(PlayerRole.DEFAULT);
+            this.role = PlayerRole.DEFAULT;
             this.listener = new Listener() {
                 @EventHandler
                 public void onPlayerLogin(PlayerLoginEvent e) {
@@ -637,8 +676,9 @@ public class Game extends SimpleTimer implements Listener {
                                 runOnRespawn = new BukkitRunnable() {
                                     @Override
                                     public void run() {
-                                        setRole(PlayerRole.INFECTEE);
-                                        getPlayer().getInventory().addItem(Kits.getKit(KitNodes.INFECTEE).toArray(new ItemStack[0]));
+                                        setRole(PlayerRole.INFECTEE, true, false);
+                                        giveRoleKit(Participant.this, PlayerRole.INFECTEE);
+                                        checkState();
                                     }
                                 };
                                 StatView.get(getPlayer()).addValue(Stats.CELL_METAMORPHOSIS, 1);
@@ -659,8 +699,9 @@ public class Game extends SimpleTimer implements Listener {
                                     mainHand.setAmount(mainHand.getAmount() - 1);
                                     getPlayer().getInventory().setItemInMainHand(mainHand);
                                     target.getPlayer().getInventory().clear();
-                                    target.setRole(PlayerRole.SURVIVOR);
-                                    target.getPlayer().getInventory().addItem(Kits.getKit(KitNodes.SURVIVOR).toArray(new ItemStack[0]));
+                                    target.setRole(PlayerRole.SURVIVOR, true, false);
+                                    giveRoleKit(target, PlayerRole.SURVIVOR);
+                                    checkState();
 
                                     if (getHumanCount() >= 2) {
                                         lastHumanBuff = false;
@@ -744,9 +785,7 @@ public class Game extends SimpleTimer implements Listener {
         public void onEnd() {
             HandlerList.unregisterAll(listener);
             for (Participant participant : participants.values()) {
-                final Player player = participant.getPlayer();
-                player.getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED).removeModifier(MODIFIER_SPEED);
-                player.getAttribute(org.bukkit.attribute.Attribute.ATTACK_DAMAGE).removeModifier(MODIFIER_DAMAGE);
+                removeGameModifiers(participant.getPlayer());
                 PlayerRole.DEFAULT.setup(participant);
             }
         }
@@ -756,10 +795,17 @@ public class Game extends SimpleTimer implements Listener {
         }
 
         public PlayerRole setRole(@NotNull PlayerRole role) {
+            return setRole(role, true, true);
+        }
+
+        private PlayerRole setRole(@NotNull PlayerRole role, boolean applySetup, boolean checkState) {
             this.role = role;
-            if (!isRunning()) return role;
-            role.setup(this);
-            checkState();
+            if (isRunning() && applySetup) {
+                role.setup(this);
+            }
+            if (checkState) {
+                checkState();
+            }
             return role;
         }
 
@@ -851,15 +897,64 @@ public class Game extends SimpleTimer implements Listener {
     }
 
     public static void resetPlayerAfterGame(Player player) {
+        removeGameModifiers(player);
         player.getInventory().clear();
         player.getInventory().setArmorContents(new ItemStack[4]);
         player.getActivePotionEffects().forEach(effect -> player.removePotionEffect(effect.getType()));
         player.getAttribute(Attribute.MAX_HEALTH).setBaseValue(20);
         player.setHealth(Math.min(20, player.getAttribute(Attribute.MAX_HEALTH).getValue()));
         player.setPlayerListName(player.getName());
+        player.setWalkSpeed(0.2F);
+        player.setFlySpeed(0.1F);
+        player.setGlowing(false);
+    }
+
+    public static void removeGameModifiers(Player player) {
+        removeModifier(player, Attribute.MOVEMENT_SPEED, ZOMBIE_SPEED_KEY);
+        removeModifier(player, Attribute.ATTACK_DAMAGE, ZOMBIE_DAMAGE_KEY);
+        removeModifier(player, Attribute.MOVEMENT_SPEED, HUMAN_SPEED_KEY);
+        removeModifier(player, Attribute.ATTACK_DAMAGE, HUMAN_DAMAGE_KEY);
+    }
+
+    private static void removeModifier(Player player, Attribute attribute, NamespacedKey key) {
+        AttributeInstance instance = player.getAttribute(attribute);
+        if (instance == null) return;
+        for (AttributeModifier modifier : new ArrayList<>(instance.getModifiers())) {
+            if (modifier.getKey().equals(key)) {
+                instance.removeModifier(modifier);
+            }
+        }
+    }
+
+    private boolean shouldInfectOnQuit(Participant participant) {
+        return isRunning()
+                && currentPhase != GamePhase.PRE_GAME
+                && (participant.getRole() == PlayerRole.SURVIVOR || participant.getRole() == PlayerRole.HERO);
+    }
+
+    private void giveRoleKit(Participant participant, PlayerRole role) {
+        KitNodes node = getKitNode(role);
+        if (node == null) return;
+        participant.getPlayer().getInventory().addItem(Kits.getKit(node).toArray(new ItemStack[0]));
+    }
+
+    private KitNodes getKitNode(PlayerRole role) {
+        switch (role) {
+            case SURVIVOR:
+                return KitNodes.SURVIVOR;
+            case HERO:
+                return KitNodes.HERO;
+            case INITIAL_ZOMBIE:
+                return KitNodes.INITIAL_ZOMBIE;
+            case INFECTEE:
+                return KitNodes.INFECTEE;
+            default:
+                return null;
+        }
     }
 
     public void checkState() {
+        if (suppressStateChecks) return;
         if (currentPhase == GamePhase.PRE_GAME) return;
         if (!isRunning()) return;
         final int survivorCount = getHumanCount();
@@ -882,7 +977,7 @@ public class Game extends SimpleTimer implements Listener {
             if (survivorCount == 1) {
                 if (!lastHumanBuff) {
                     for (Participant participant : getParticipantsOnline()) {
-                        if (participant.role.isHuman()) {
+                        if (participant.role.isHuman() && participant.role != PlayerRole.DEFAULT) {
                             lastHumanBuff = true;
                             try {
                                 participant.getPlayer().getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED).addModifier(MODIFIER_HUMAN_SPEED);
@@ -901,7 +996,7 @@ public class Game extends SimpleTimer implements Listener {
                 }
             } else if (lastHumanBuff) {
                 for (Participant participant : getParticipantsOnline()) {
-                    if (participant.role.isHuman()) {
+                    if (participant.role.isHuman() && participant.role != PlayerRole.DEFAULT) {
                         try {
                             participant.getPlayer().getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED).removeModifier(MODIFIER_HUMAN_SPEED);
                             participant.getPlayer().getAttribute(org.bukkit.attribute.Attribute.ATTACK_DAMAGE).removeModifier(MODIFIER_HUMAN_DAMAGE);

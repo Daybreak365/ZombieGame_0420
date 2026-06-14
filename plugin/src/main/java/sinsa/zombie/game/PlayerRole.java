@@ -28,6 +28,7 @@ public enum PlayerRole {
         @Override
         public void setup(Game.Participant participant) {
             final Player player = participant.getPlayer();
+            participant.getGame().prepareRoleState(player);
             this.setPlayerListName(player);
             player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).setBaseValue(20);
             player.setHealth(20);
@@ -59,6 +60,7 @@ public enum PlayerRole {
         @Override
         public void setup(Game.Participant participant) {
             final Player player = participant.getPlayer();
+            participant.getGame().prepareRoleState(player);
             this.setPlayerListName(player);
             player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).setBaseValue(BaseConfig.getRoleHealth(this));
             player.setHealth(BaseConfig.getRoleHealth(this));
@@ -90,6 +92,7 @@ public enum PlayerRole {
         @Override
         public void setup(Game.Participant participant) {
             final Player player = participant.getPlayer();
+            participant.getGame().prepareRoleState(player);
             this.setPlayerListName(player);
             player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).setBaseValue(BaseConfig.getRoleHealth(this));
             player.setHealth(BaseConfig.getRoleHealth(this));
@@ -121,6 +124,7 @@ public enum PlayerRole {
         @Override
         public void setup(Game.Participant participant) {
             final Player player = participant.getPlayer();
+            participant.getGame().prepareRoleState(player);
             this.setPlayerListName(player);
             player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).setBaseValue(BaseConfig.getRoleHealth(this));
             player.setHealth(BaseConfig.getRoleHealth(this));
@@ -147,6 +151,7 @@ public enum PlayerRole {
         @Override
         public void setup(Game.Participant participant) {
             final Player player = participant.getPlayer();
+            participant.getGame().prepareRoleState(player);
             this.setPlayerListName(player);
             player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).setBaseValue(BaseConfig.getRoleHealth(this));
             player.setHealth(BaseConfig.getRoleHealth(this));
@@ -200,6 +205,30 @@ public enum PlayerRole {
     }
 
 
+    void applyRuntimeState(Game.Participant participant, boolean clearInventory) {
+        final Player player = participant.getPlayer();
+        participant.getGame().prepareRoleState(player);
+        this.setPlayerListName(player);
+        if (this == DEFAULT) {
+            player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).setBaseValue(20);
+            player.setHealth(20);
+            player.removePotionEffect(PotionEffectType.NIGHT_VISION);
+        } else {
+            player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).setBaseValue(BaseConfig.getRoleHealth(this));
+            player.setHealth(BaseConfig.getRoleHealth(this));
+            if (isZombie()) {
+                player.addPotionEffect(Game.NIGHT_VISION, true);
+            } else {
+                player.removePotionEffect(PotionEffectType.NIGHT_VISION);
+            }
+        }
+        if (clearInventory && isZombie()) {
+            player.getInventory().clear();
+        }
+        applyArmor(player);
+        updateScoreboardTeam(participant, player);
+    }
+
     private void applyArmor(Player player) {
         player.getInventory().setArmorContents(getArmorContents());
     }
@@ -232,6 +261,16 @@ public enum PlayerRole {
                 return KitNodes.INFECTEE;
             default:
                 return null;
+        }
+    }
+
+    private void updateScoreboardTeam(Game.Participant participant, Player player) {
+        for (Map.Entry<PlayerRole, Team> entry : participant.getGame().scoreboardTeams.entrySet()) {
+            if (entry.getKey() == this) {
+                entry.getValue().addEntry(player.getName());
+            } else {
+                entry.getValue().removeEntry(player.getName());
+            }
         }
     }
 
