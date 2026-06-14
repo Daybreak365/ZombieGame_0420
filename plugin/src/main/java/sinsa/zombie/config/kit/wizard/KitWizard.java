@@ -3,8 +3,6 @@ package sinsa.zombie.config.kit.wizard;
 import org.bukkit.Material;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.entity.Player;
-import org.bukkit.event.inventory.ClickType;
-import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -26,11 +24,12 @@ public class KitWizard extends CustomGUI {
     private static final int KIT_SIZE = 36;
     private static final int ARMOR_SIZE = 4;
     private static final int ARMOR_START = KIT_SIZE;
+    private static final int GUI_SIZE = 45;
 
     private final KitNodes node;
 
     public KitWizard(Player player, KitNodes node, Plugin plugin) {
-        super(player, 45, "§2§l아이템/방어구를 설정하세요. §0§l(§8§l" + node.name() + "§0§l)§r", plugin);
+        super(player, GUI_SIZE, "§2§l아이템/방어구를 설정하세요. §0§l(§8§l" + node.name() + "§0§l)§r", plugin);
         this.node = node;
     }
 
@@ -45,9 +44,13 @@ public class KitWizard extends CustomGUI {
         slot = ARMOR_START;
         for (ItemStack itemStack : Kits.getArmorKit(node)) {
             if (slot >= ARMOR_START + ARMOR_SIZE) break;
-            gui.setItem(slot++, itemStack);
+            if (itemStack != null && itemStack.getType() != Material.AIR) {
+                gui.setItem(slot, itemStack);
+            }
+            slot++;
         }
 
+        fillDecoration(gui);
         fillArmorPlaceholders(gui);
 
         player.sendMessage("§7상단 36칸은 지급 아이템, 하단 첫 4칸은 방어구(신발/레깅스/흉갑/투구)입니다.");
@@ -60,11 +63,14 @@ public class KitWizard extends CustomGUI {
         if (!e.getInventory().equals(gui)) return;
 
         int slot = e.getRawSlot();
-        if (slot < ARMOR_START || slot >= ARMOR_START + ARMOR_SIZE) {
+        if (slot < KIT_SIZE || slot >= GUI_SIZE) {
             return;
         }
 
         e.setCancelled(true);
+        if (slot < ARMOR_START || slot >= ARMOR_START + ARMOR_SIZE) {
+            return;
+        }
 
         ItemStack current = gui.getItem(slot);
         ItemStack cursor = e.getCursor();
@@ -84,10 +90,8 @@ public class KitWizard extends CustomGUI {
                 return;
             }
 
-            if (e.getClick() == ClickType.RIGHT || e.getAction() == InventoryAction.SWAP_WITH_CURSOR) {
-                gui.setItem(slot, cursor.clone());
-                e.setCursor(current.clone());
-            }
+            gui.setItem(slot, cursor.clone());
+            e.setCursor(current.clone());
         }
     }
 
@@ -95,11 +99,33 @@ public class KitWizard extends CustomGUI {
     protected void onUnregister(Inventory gui) {
         try {
             Kits.setKit(node, compact(Arrays.asList(gui.getContents()).subList(0, KIT_SIZE)));
-            Kits.setArmorKit(node, compact(Arrays.asList(gui.getContents()).subList(KIT_SIZE, KIT_SIZE + ARMOR_SIZE)));
+            Kits.setArmorKit(node, collectArmorSlots(gui));
             Kits.instance.update();
             player.sendMessage("§2§l" + node.name() + " 킷/방어구 설정 완료!");
         } catch (IOException | InvalidConfigurationException e) {
             logger.log(LogType.ERROR, "킷을 저장하는 도중 오류가 발생헀습니다.");
+        }
+    }
+
+    private List<ItemStack> collectArmorSlots(Inventory gui) {
+        List<ItemStack> armorSlots = new ArrayList<>(ARMOR_SIZE);
+        for (int i = 0; i < ARMOR_SIZE; i++) {
+            ItemStack item = gui.getItem(ARMOR_START + i);
+            armorSlots.add(item == null || item.getType() == Material.AIR || isArmorPlaceholder(item) ? null : item);
+        }
+        return armorSlots;
+    }
+
+    private void fillDecoration(Inventory gui) {
+        ItemStack deco = new ItemBuilder(MaterialX.BLACK_STAINED_GLASS_PANE)
+                .displayName("§8")
+                .lore("§7방어구 슬롯을 선택해 장착/해제하세요.")
+                .build();
+
+        for (int i = KIT_SIZE; i < GUI_SIZE; i++) {
+            if (i < ARMOR_START || i >= ARMOR_START + ARMOR_SIZE) {
+                gui.setItem(i, deco);
+            }
         }
     }
 

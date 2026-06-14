@@ -254,16 +254,15 @@ public class Commands implements CommandExecutor, TabCompleter {
 							Messages.sendError(sender, "'§4" + args[0] + "§c'" + KoreanUtil.getJosa(args[0], KoreanUtil.Josa.은는) + " 존재하지 않는 플레이어입니다.");
 							return true;
 						}
-						final Game.Participant participant = game.getParticipant(target.getUniqueId());
+						Game.Participant participant = game.getParticipant(target.getUniqueId());
 						if (participant == null) {
-							Messages.sendError(sender, "'§4" + args[0] + "§c'" + KoreanUtil.getJosa(args[0], KoreanUtil.Josa.은는) + " 게임에 참가하고 있지 않습니다.");
-							return true;
+							participant = game.addParticipant(target, false);
 						}
 						if (participant.getRole() == PlayerRole.SURVIVOR) {
 							Messages.sendError(sender, "대상이 이미 생존자입니다.");
 							return true;
 						}
-						participant.setRole(PlayerRole.SURVIVOR);
+						game.assignRole(target, PlayerRole.SURVIVOR, true);
 						sender.sendMessage("§2§l" + args[0] + "§a§l" + KoreanUtil.getJosa(args[0], KoreanUtil.Josa.을를) + " 생존자로 변경했습니다.");
 						return true;
 					}
@@ -285,16 +284,15 @@ public class Commands implements CommandExecutor, TabCompleter {
 							Messages.sendError(sender, "'§4" + args[0] + "§c'" + KoreanUtil.getJosa(args[0], KoreanUtil.Josa.은는) + " 존재하지 않는 플레이어입니다.");
 							return true;
 						}
-						final Game.Participant participant = game.getParticipant(target.getUniqueId());
+						Game.Participant participant = game.getParticipant(target.getUniqueId());
 						if (participant == null) {
-							Messages.sendError(sender, "'§4" + args[0] + "§c'" + KoreanUtil.getJosa(args[0], KoreanUtil.Josa.은는) + " 게임에 참가하고 있지 않습니다.");
-							return true;
+							participant = game.addParticipant(target, false);
 						}
 						if (participant.getRole() == PlayerRole.INFECTEE) {
 							Messages.sendError(sender, "대상이 이미 감염자입니다.");
 							return true;
 						}
-						participant.setRole(PlayerRole.INFECTEE);
+						game.assignRole(target, PlayerRole.INFECTEE, true);
 						sender.sendMessage("§4§l" + args[0] + "§c§l" + KoreanUtil.getJosa(args[0], KoreanUtil.Josa.을를) + " 감염자로 변경했습니다.");
 						return true;
 					}
@@ -316,16 +314,15 @@ public class Commands implements CommandExecutor, TabCompleter {
 							Messages.sendError(sender, "'§4" + args[0] + "§c'" + KoreanUtil.getJosa(args[0], KoreanUtil.Josa.은는) + " 존재하지 않는 플레이어입니다.");
 							return true;
 						}
-						final Game.Participant participant = game.getParticipant(target.getUniqueId());
+						Game.Participant participant = game.getParticipant(target.getUniqueId());
 						if (participant == null) {
-							Messages.sendError(sender, "'§4" + args[0] + "§c'" + KoreanUtil.getJosa(args[0], KoreanUtil.Josa.은는) + " 게임에 참가하고 있지 않습니다.");
-							return true;
+							participant = game.addParticipant(target, false);
 						}
 						if (participant.getRole() == PlayerRole.INITIAL_ZOMBIE) {
 							Messages.sendError(sender, "대상이 이미 최초 좀비입니다.");
 							return true;
 						}
-						participant.setRole(PlayerRole.INITIAL_ZOMBIE);
+						game.assignRole(target, PlayerRole.INITIAL_ZOMBIE, true);
 						sender.sendMessage("§4§l" + args[0] + "§c§l" + KoreanUtil.getJosa(args[0], KoreanUtil.Josa.을를) + " 최초 좀비로 변경했습니다.");
 						return true;
 					}
@@ -347,16 +344,15 @@ public class Commands implements CommandExecutor, TabCompleter {
 							Messages.sendError(sender, "'§4" + args[0] + "§c'" + KoreanUtil.getJosa(args[0], KoreanUtil.Josa.은는) + " 존재하지 않는 플레이어입니다.");
 							return true;
 						}
-						final Game.Participant participant = game.getParticipant(target.getUniqueId());
+						Game.Participant participant = game.getParticipant(target.getUniqueId());
 						if (participant == null) {
-							Messages.sendError(sender, "'§4" + args[0] + "§c'" + KoreanUtil.getJosa(args[0], KoreanUtil.Josa.은는) + " 게임에 참가하고 있지 않습니다.");
-							return true;
+							participant = game.addParticipant(target, false);
 						}
 						if (participant.getRole() == PlayerRole.HERO) {
 							Messages.sendError(sender, "대상이 이미 영웅입니다.");
 							return true;
 						}
-						participant.setRole(PlayerRole.HERO);
+						game.assignRole(target, PlayerRole.HERO, true);
 						sender.sendMessage("§e§l" + args[0] + "§6§l" + KoreanUtil.getJosa(args[0], KoreanUtil.Josa.을를) + " 영웅으로 변경했습니다.");
 						return true;
 					}
